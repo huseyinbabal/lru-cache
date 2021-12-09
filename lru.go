@@ -1,6 +1,9 @@
 package lru
 
-import "container/list"
+import (
+	"container/list"
+	"sync"
+)
 
 type KeyValue struct {
 	Key   []byte
@@ -11,6 +14,7 @@ type lru struct {
 	capacity int
 	cache    *list.List
 	elements map[string]*list.Element
+	mutex    sync.RWMutex
 }
 
 func New(capacity int) *lru {
@@ -22,6 +26,8 @@ func New(capacity int) *lru {
 }
 
 func (l *lru) Get(key []byte) []byte {
+	l.mutex.RLock()
+	l.mutex.RUnlock()
 	if elem, ok := l.elements[string(key)]; ok {
 		value := elem.Value.(*list.Element).Value.(KeyValue).Value
 		l.cache.MoveToFront(elem)
@@ -31,6 +37,8 @@ func (l *lru) Get(key []byte) []byte {
 }
 
 func (l *lru) Put(key, val []byte) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
 	if elem, ok := l.elements[string(key)]; ok {
 		l.cache.MoveToFront(elem)
 		elem.Value.(*list.Element).Value = KeyValue{
@@ -55,6 +63,8 @@ func (l *lru) Put(key, val []byte) {
 }
 
 func (l *lru) Remove(key []byte) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
 	if elem, ok := l.elements[string(key)]; ok {
 		delete(l.elements, string(key))
 		l.cache.Remove(elem)

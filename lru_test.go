@@ -1,73 +1,64 @@
 package lru
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"log"
-	"net/http"
+	"sync"
 	"testing"
+	"time"
 )
 
-var cache = New(255)
+var cache = New(9)
 
-type IpResponse struct {
-	Status      string  `json:"status"`
-	Country     string  `json:"country"`
-	CountryCode string  `json:"countryCode"`
-	Region      string  `json:"region"`
-	RegionName  string  `json:"regionName"`
-	City        string  `json:"city"`
-	Zip         string  `json:"zip"`
-	Lat         float64 `json:"lat"`
-	Lon         float64 `json:"lon"`
-	Timezone    string  `json:"timezone"`
-	Isp         string  `json:"isp"`
-	Org         string  `json:"org"`
-	As          string  `json:"as"`
-	Query       string  `json:"query"`
+var students = map[int]string{
+	0: "mert",
+	1: "john",
+	2: "jack",
+	3: "ahmet",
+	4: "mehmet",
+	5: "veli",
+	6: "matthew",
+	7: "jessie",
+	8: "james",
 }
 
-func getIpGeoLocationWithCache(ip string) IpResponse {
-	val := cache.Get([]byte(ip))
+func getStudentWithCache(id int) string {
+	val := cache.Get([]byte(string(rune(id))))
 	if val != nil {
-		log.Println("Getting from cache " + ip)
-		var data IpResponse
-		json.Unmarshal(val, &data)
-		return data
+
+		return string(val)
 	}
-	ipData := getIpGeoLocation(ip)
-	ipDataBytes := new(bytes.Buffer)
-	json.NewEncoder(ipDataBytes).Encode(ipData)
-	log.Printf("Puting into cache %v", ipData)
-	cache.Put([]byte(ip), ipDataBytes.Bytes())
-	return ipData
+	student := getStudent(id)
+	cache.Put([]byte(string(rune(id))), []byte(student))
+	return student
 }
 
-func getIpGeoLocation(ip string) IpResponse {
-	resp, err := http.Get("http://ip-api.com/json/" + ip)
-	if err != nil {
-		log.Fatalf("http get err %v", err)
-	}
+func getStudent(id int) string {
+	addLoad()
+	return students[id]
+}
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("read err %v", err)
-	}
-
-	var data IpResponse
-	json.Unmarshal(body, &data)
-	return data
+func addLoad() {
+	time.Sleep(time.Millisecond * 10)
 }
 func BenchmarkGetWithoutCache(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		getIpGeoLocation(fmt.Sprintf("24.48.9.%d", i))
+		getStudent(i % 9)
 	}
 }
 
 func BenchmarkGetWithCache(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		getIpGeoLocationWithCache(fmt.Sprintf("24.48.9.%d", i))
+		getStudentWithCache(i % 9)
 	}
+}
+
+func BenchmarkGetWithCacheWithoutDataRace(b *testing.B) {
+	var wg sync.WaitGroup
+	for i := 0; i < b.N; i++ {
+		wg.Add(1)
+		go func(a int) {
+			getStudentWithCache(a % 9)
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
 }
