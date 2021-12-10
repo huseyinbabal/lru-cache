@@ -70,3 +70,15 @@ func (l *Cache) Remove(key []byte) {
 		l.cache.Remove(elem)
 	}
 }
+
+func (l *Cache) Clear() {
+	var wg sync.WaitGroup
+	for key := range l.elements {
+		wg.Add(1)
+		go func(k string) {
+			l.Remove([]byte(k))
+			wg.Done()
+		}(key)
+	}
+	wg.Wait()
+}
