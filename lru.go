@@ -10,22 +10,22 @@ type KeyValue struct {
 	Value []byte
 }
 
-type lru struct {
+type Cache struct {
 	capacity int
 	cache    *list.List
 	elements map[string]*list.Element
 	mutex    sync.RWMutex
 }
 
-func New(capacity int) *lru {
-	return &lru{
+func New(capacity int) *Cache {
+	return &Cache{
 		capacity: capacity,
 		cache:    list.New(),
 		elements: make(map[string]*list.Element),
 	}
 }
 
-func (l *lru) Get(key []byte) []byte {
+func (l *Cache) Get(key []byte) []byte {
 	l.mutex.RLock()
 	l.mutex.RUnlock()
 	if elem, ok := l.elements[string(key)]; ok {
@@ -36,7 +36,7 @@ func (l *lru) Get(key []byte) []byte {
 	return nil
 }
 
-func (l *lru) Put(key, val []byte) {
+func (l *Cache) Put(key, val []byte) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	if elem, ok := l.elements[string(key)]; ok {
@@ -62,7 +62,7 @@ func (l *lru) Put(key, val []byte) {
 	l.elements[string(key)] = ptr
 }
 
-func (l *lru) Remove(key []byte) {
+func (l *Cache) Remove(key []byte) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	if elem, ok := l.elements[string(key)]; ok {
